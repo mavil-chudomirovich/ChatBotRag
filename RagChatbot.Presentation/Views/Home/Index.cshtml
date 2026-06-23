@@ -92,11 +92,6 @@
 
             @if (User.IsInRole("Học sinh") || User.IsInRole("Student"))
             {
-                <div id="stopGenerationContainer" class="absolute left-1/2 -top-12 -translate-x-1/2 hidden z-20">
-                    <button onclick="stopGeneration()" class="flex items-center gap-2 px-4 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-100 text-xs font-semibold rounded-full shadow-lg border border-slate-700 transition-all">
-                        <i class="fa-solid fa-stop text-[10px] text-red-400"></i> Dừng tạo
-                    </button>
-                </div>
 
                 <form id="chatForm" class="flex items-end gap-3 max-w-4xl mx-auto">
                     <input type="hidden" id="currentSubjectId" />
@@ -153,38 +148,17 @@
 <script>
 let currentSubjectId = null;
 let currentSessionId = "";
-let isReceivingStream = false;
 let currentAssistantMessageDiv = null;
-let currentAssistantMarkdown = "";
 let isAiThinking = false;
 let allDocIds = [];
 
-// ── SignalR ──────────────────────────────────────────────────
-const connection = new signalR.HubConnectionBuilder()
-    .withUrl("/chatHub")
-    .configureLogging(signalR.LogLevel.Warning)
-    .build();
-
-async function startConnection() {
-    try {
-        if (connection.state === signalR.HubConnectionState.Connected) return;
-        await connection.start();
-        updateStatus(true);
-        if (currentSubjectId) connection.invoke("LoadSubjectHistory", currentSubjectId).catch(console.error);
-    } catch (err) {
-        console.error(err);
-        setTimeout(startConnection, 5000);
-    }
-}
-
-connection.onclose(async () => { updateStatus(false); await startConnection(); });
-
+// ── Connection Status Mock (Since SignalR is removed) ──────
 function updateStatus(connected) {
     document.getElementById("statusDot").className = `w-2 h-2 rounded-full flex-shrink-0 ${connected ? 'bg-emerald-500' : 'bg-red-500'}`;
-    document.getElementById("statusText").textContent = connected ? "Connected" : "Disconnected";
+    document.getElementById("statusText").textContent = connected ? "Ready" : "Offline";
 }
 
-startConnection();
+updateStatus(true); // Always ready now
 
 // ── Select Subject ───────────────────────────────────────────
 function toggleDepartment(btn) {
@@ -194,7 +168,7 @@ function toggleDepartment(btn) {
     content.classList.toggle('hidden');
 }
 
-function selectSubject(id, name, el) {
+async function selectSubject(id, name, el) {
     currentSubjectId = id;
     currentSessionId = "";
 
@@ -214,9 +188,30 @@ function selectSubject(id, name, el) {
             <span class="px-4 py-1.5 rounded-full bg-surface-700 text-xs text-slate-400 animate-pulse">Đang tải lịch sử...</span>
         </div>`;
 
-    // Load history
-    if (connection.state === signalR.HubConnectionState.Connected)
-        connection.invoke("LoadSubjectHistory", id).catch(console.error);
+    // Load history via API
+    try {
+        const res = await fetch(`/api/Chat/LoadSubjectHistory?subjectId=${id}`);
+        const data = await res.json();
+        
+        currentSessionId = data.sessionId || "";
+        const messages = data.messages || [];
+        
+        const container = document.getElementById("chatMessages");
+        container.innerHTML = "";
+
+        document.getElementById("chatSubtitle").textContent =
+            messages && messages.length > 0 ? `${messages.length} tin nhắn` : "Phiên chat mới";
+
+        if (!messages || messages.length === 0) {
+            container.innerHTML = `<div class="flex justify-center"><span class="px-4 py-1.5 rounded-full bg-surface-700 text-xs text-slate-400">Bắt đầu phiên chat mới ✨</span></div>`;
+        } else {
+            messages.forEach(msg => appendMessage(msg.role, msg.content, msg.citations));
+            container.scrollTop = container.scrollHeight;
+        }
+    } catch (e) {
+        console.error(e);
+        document.getElementById("chatMessages").innerHTML = `<div class="flex justify-center"><span class="px-4 py-1.5 rounded-full bg-red-100 text-xs text-red-500">Lỗi khi tải lịch sử.</span></div>`;
+    }
 
     // Load document filter
     loadDocFilter(id);
@@ -293,67 +288,6 @@ function toggleSelectAll() {
     updateFilterInfo();
 }
 
-// ── SignalR Callbacks ────────────────────────────────────────
-connection.on("SessionCreated", id => { currentSessionId = id; });
-
-connection.on("SessionLoaded", (sessionId, messages) => {
-    currentSessionId = sessionId;
-    const container = document.getElementById("chatMessages");
-    container.innerHTML = "";
-
-    document.getElementById("chatSubtitle").textContent =
-        messages && messages.length > 0 ? `${messages.length} tin nhắn` : "Phiên chat mới";
-
-    if (!messages || messages.length === 0) {
-        container.innerHTML = `<div class="flex justify-center"><span class="px-4 py-1.5 rounded-full bg-surface-700 text-xs text-slate-400">Bắt đầu phiên chat mới ✨</span></div>`;
-        return;
-    }
-
-    messages.forEach(msg => appendMessage(msg.role, msg.content, msg.citations));
-    container.scrollTop = container.scrollHeight;
-});
-
-connection.on("ReceiveToken", (token, isEnd) => {
-    const container = document.getElementById("chatMessages");
-
-    if (!isReceivingStream && !isEnd && token === "") {
-        removeThinkingIndicator();
-        isReceivingStream = true;
-        currentAssistantMarkdown = "";
-        if (!currentAssistantMessageDiv) createAiBubble();
-        currentAssistantMessageDiv.innerHTML = '<span class="text-brand-400 animate-pulse font-bold text-lg">▍</span>';
-        container.scrollTop = container.scrollHeight;
-    } else if (isReceivingStream && !isEnd) {
-        currentAssistantMarkdown += token;
-        currentAssistantMessageDiv.innerHTML = marked.parse(currentAssistantMarkdown) +
-            '<span class="text-brand-400 animate-pulse font-bold text-lg inline-block ml-1">▍</span>';
-        container.scrollTop = container.scrollHeight;
-    } else if (isEnd) {
-        isReceivingStream = false;
-        if (currentAssistantMessageDiv) {
-            currentAssistantMessageDiv.innerHTML = marked.parse(currentAssistantMarkdown);
-            if (token && token !== "null" && token !== "[]") renderCitations(token, currentAssistantMessageDiv);
-        }
-        container.scrollTop = container.scrollHeight;
-        setChatInputState(true);
-        hideStopButton();
-    }
-});
-
-connection.on("ReceiveError", msg => {
-    removeThinkingIndicator();
-    isReceivingStream = false;
-    setChatInputState(true);
-    hideStopButton();
-    if (currentAssistantMessageDiv) {
-        if (currentAssistantMarkdown.length > 0) {
-            currentAssistantMessageDiv.innerHTML = marked.parse(currentAssistantMarkdown) + `<div class="text-red-400 text-sm mt-2"><i class="fa-solid fa-circle-exclamation mr-1"></i>${msg}</div>`;
-        } else {
-            currentAssistantMessageDiv.innerHTML = `<div class="text-red-400 text-sm"><i class="fa-solid fa-circle-exclamation mr-1"></i>${msg}</div>`;
-        }
-    }
-});
-
 // ── Chat Form ────────────────────────────────────────────────
 document.getElementById("chatForm").addEventListener("submit", async e => {
     e.preventDefault();
@@ -365,18 +299,52 @@ document.getElementById("chatForm").addEventListener("submit", async e => {
     appendMessage("user", msg, null);
 
     setChatInputState(false);
+    showThinkingIndicator();
 
     const selectedDocs = getSelectedDocIds();
+    
     try {
-        showThinkingIndicator();
-        showStopButton();
-        await connection.send("SendMessage", currentSessionId, currentSubjectId, msg, selectedDocs);
+        const payload = {
+            SessionIdStr: currentSessionId,
+            SubjectId: currentSubjectId,
+            Message: msg,
+            DocumentIds: selectedDocs
+        };
+
+        const response = await fetch('/api/Chat/SendMessage', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        removeThinkingIndicator();
+
+        if (!response.ok) {
+            const errData = await response.json();
+            throw new Error(errData.error || "Có lỗi xảy ra khi gọi API");
+        }
+
+        const data = await response.json();
+        if (data.sessionId) {
+            currentSessionId = data.sessionId;
+        }
+
+        // Show the final message
+        createAiBubble();
+        currentAssistantMessageDiv.innerHTML = marked.parse(data.response);
+        if (data.citations && data.citations !== "null" && data.citations !== "[]") {
+            renderCitations(data.citations, currentAssistantMessageDiv);
+        }
+        
+        const container = document.getElementById("chatMessages");
+        container.scrollTop = container.scrollHeight;
+        
     } catch(err) {
         removeThinkingIndicator();
+        createAiBubble();
+        currentAssistantMessageDiv.innerHTML = `<div class="text-red-400 text-sm"><i class="fa-solid fa-circle-exclamation mr-1"></i>${err.message || 'Có lỗi xảy ra.'}</div>`;
+    } finally {
         setChatInputState(true);
-        hideStopButton();
-        if (currentAssistantMessageDiv)
-            currentAssistantMessageDiv.innerHTML = `<div class="text-red-400 text-sm"><i class="fa-solid fa-circle-exclamation mr-1"></i>Có lỗi xảy ra.</div>`;
     }
 });
 
@@ -399,21 +367,6 @@ function setChatInputState(enabled) {
         sendBtn.disabled = false;
         input.placeholder = "Hỏi về " + document.getElementById("chatTitle").textContent + "...";
         input.focus();
-    }
-}
-
-function showStopButton() {
-    document.getElementById("stopGenerationContainer").classList.remove("hidden");
-}
-
-function hideStopButton() {
-    document.getElementById("stopGenerationContainer").classList.add("hidden");
-}
-
-function stopGeneration() {
-    if (currentSessionId && connection.state === signalR.HubConnectionState.Connected) {
-        connection.invoke("StopGeneration", currentSessionId).catch(console.error);
-        hideStopButton();
     }
 }
 
@@ -449,7 +402,7 @@ function createAiBubble() {
     const wrapper = document.createElement("div");
     wrapper.className = "flex items-start gap-3";
     const bubble = document.createElement("div");
-    bubble.className = "flex-1 bg-white dark:bg-slate-900 rounded-2xl rounded-tl-sm px-5 py-4 text-sm text-gray-800 dark:text-slate-100 border border-slate-200 dark:border-slate-700 shadow-sm transition-colors duration-200";
+    bubble.className = "flex-1 bg-white dark:bg-slate-900 rounded-2xl rounded-tl-sm px-5 py-4 text-sm text-gray-800 dark:text-slate-100 border border-slate-200 dark:border-slate-700 shadow-sm transition-colors duration-200 prose prose-sm dark:prose-invert max-w-none";
     wrapper.innerHTML = `<span class="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-500 to-green-600 flex items-center justify-center flex-shrink-0 mt-1 shadow-md shadow-emerald-500/30">
         <i class="fa-solid fa-robot text-[11px] text-white"></i></span>`;
     wrapper.appendChild(bubble);
@@ -469,26 +422,31 @@ function showThinkingIndicator() {
             </span>
         </div>`;
     isAiThinking = true;
-    isReceivingStream = false;
 }
 
 function removeThinkingIndicator() {
     if (isAiThinking && currentAssistantMessageDiv) {
         currentAssistantMessageDiv.innerHTML = "";
         isAiThinking = false;
+        // Xóa bubble thinking đi để tạo bubble kết quả mới
+        currentAssistantMessageDiv.parentElement.remove();
+        currentAssistantMessageDiv = null;
     }
 }
 
 function renderCitations(citationsJson, el) {
     try {
-        const cits = JSON.parse(citationsJson);
+        let cits = citationsJson;
+        if (typeof citationsJson === 'string') {
+             cits = JSON.parse(citationsJson);
+        }
         if (!cits || cits.length === 0) return;
         const div = document.createElement("div");
         div.className = "mt-4 pt-3 border-t border-slate-200 dark:border-slate-700 text-xs text-slate-500 dark:text-slate-400";
         div.innerHTML = `<p class="font-semibold mb-1 text-slate-600 dark:text-slate-300">Nguồn tham khảo:</p><ul class="space-y-1">` +
             cits.map((c,i) => `<li class="flex items-start gap-1.5">
                 <span class="text-emerald-600 dark:text-emerald-400 font-bold">[${i+1}]</span>
-                <span class="font-medium hover:text-emerald-700 dark:hover:text-emerald-400 cursor-help" title="${c.ContentSnippet}">${c.FileName} – trang ${c.Page}</span>
+                <span class="font-medium hover:text-emerald-700 dark:hover:text-emerald-400 cursor-help" title="${c.ContentSnippet || c.contentSnippet}">${c.FileName || c.fileName} – trang ${c.Page || c.page}</span>
             </li>`).join('') + `</ul>`;
         el.appendChild(div);
     } catch(e) {}

@@ -236,6 +236,34 @@ namespace RagChatbot.Business.Services
             }
         }
 
+        public async Task<string> GetChatResponseAsync(string systemPrompt, string userMessage, IEnumerable<RagChatbot.Business.DTOs.ChatMessageDto>? history = null, CancellationToken cancellationToken = default)
+        {
+            var chatHistory = new ChatHistory(systemPrompt);
+            
+            if (history != null)
+            {
+                foreach (var msg in history)
+                {
+                    if (msg.Role == "user") chatHistory.AddUserMessage(msg.Content);
+                    else if (msg.Role == "assistant") chatHistory.AddAssistantMessage(msg.Content);
+                }
+            }
+            
+            chatHistory.AddUserMessage(userMessage);
+
+            var executionSettings = new PromptExecutionSettings
+            {
+                ExtensionData = new Dictionary<string, object>
+                {
+                    { "max_tokens", 2048 },
+                    { "temperature", 0.2 }
+                }
+            };
+
+            var result = await _chatCompletion.GetChatMessageContentAsync(chatHistory, executionSettings, _kernel, cancellationToken);
+            return result?.Content ?? "";
+        }
+
         public async Task<string> RewriteQueryAsync(string originalQuery, IEnumerable<RagChatbot.Business.DTOs.ChatMessageDto> history)
         {
             try

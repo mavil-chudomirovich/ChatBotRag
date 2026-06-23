@@ -41,8 +41,7 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
     });
 });
 
-// Add SignalR
-builder.Services.AddSignalR();
+
 
 // Configure Authentication
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
@@ -119,7 +118,6 @@ app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Home}/{action=Index}/{id?}");
 
-// Map SignalR Hub
-app.MapHub<RagChatbot.Presentation.Hubs.ChatHub>("/chatHub");
+
 
 app.Run();
