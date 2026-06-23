@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 
 namespace RagChatbot.DataAccess.EntityModels
 {
@@ -16,6 +16,7 @@ namespace RagChatbot.DataAccess.EntityModels
         public string LastName { get; set; } = string.Empty;
         public string Role { get; set; } = "Student";
         public bool IsActive { get; set; } = true;
+        public bool IsDeleted { get; set; } = false;
 
         public int? DepartmentId { get; set; }
         public int DailyQueryCount { get; set; } = 0;
@@ -24,7 +25,8 @@ namespace RagChatbot.DataAccess.EntityModels
         // Navigation Properties
         public Department? Department { get; set; }
         public ICollection<Subject> Subjects { get; set; } = new List<Subject>();
-        public ICollection<SubjectAssignment> SubjectAssignments { get; set; } = new List<SubjectAssignment>();
+        public ICollection<HodTerm> HodTerms { get; set; } = new List<HodTerm>();
+
 
         public SubscriptionType Subscription { get; set; } = SubscriptionType.Free; // Mặc định là Free
         public int TodayChatCount { get; set; } = 0; // Đếm số câu hỏi trong ngày

@@ -18,8 +18,8 @@ namespace RagChatbot.DataAccess.Data
         public DbSet<ChatMessage> ChatMessages { get; set; }
         public DbSet<AppUser> AppUsers { get; set; }
         public DbSet<Department> Departments { get; set; }
-        public DbSet<SubjectAssignment> SubjectAssignments { get; set; }
         public DbSet<AuditLog> AuditLogs { get; set; }
+        public DbSet<HodTerm> HodTerms { get; set; }
 
         public DbSet<ContactMessage> ContactMessages { get; set; }
         protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -33,6 +33,8 @@ namespace RagChatbot.DataAccess.Data
             modelBuilder.Entity<AppUser>()
                 .HasIndex(u => u.Email)
                 .IsUnique();
+
+            modelBuilder.Entity<AppUser>().HasQueryFilter(u => !u.IsDeleted);
 
             // Subject
             modelBuilder.Entity<Subject>()
@@ -74,23 +76,19 @@ namespace RagChatbot.DataAccess.Data
             modelBuilder.Entity<Subject>()
                 .HasOne(s => s.Department)
                 .WithMany(d => d.Subjects)
-                .HasForeignKey(s => s.DepartmentId)
                 .OnDelete(DeleteBehavior.Cascade);
 
-            // SubjectAssignment (Many-to-Many)
-            modelBuilder.Entity<SubjectAssignment>()
-                .HasKey(sa => new { sa.SubjectId, sa.LecturerId });
-
-            modelBuilder.Entity<SubjectAssignment>()
-                .HasOne(sa => sa.Subject)
-                .WithMany(s => s.Assignments)
-                .HasForeignKey(sa => sa.SubjectId)
+            // HodTerm
+            modelBuilder.Entity<HodTerm>()
+                .HasOne(t => t.User)
+                .WithMany(u => u.HodTerms)
+                .HasForeignKey(t => t.AppUserId)
                 .OnDelete(DeleteBehavior.Cascade);
 
-            modelBuilder.Entity<SubjectAssignment>()
-                .HasOne(sa => sa.Lecturer)
-                .WithMany(u => u.SubjectAssignments)
-                .HasForeignKey(sa => sa.LecturerId)
+            modelBuilder.Entity<HodTerm>()
+                .HasOne(t => t.Department)
+                .WithMany()
+                .HasForeignKey(t => t.DepartmentId)
                 .OnDelete(DeleteBehavior.Cascade);
 
             // AuditLog
@@ -108,10 +106,13 @@ namespace RagChatbot.DataAccess.Data
 
             modelBuilder.Entity<AppUser>().HasData(
                 new AppUser { Id = 1, Email = "admin@gmail.com", PasswordHash = HashPassword("@Admin1"), Role = "Admin", FirstName = "Quản trị", LastName = "Hệ thống" },
-                new AppUser { Id = 2, Email = "lecturer@gmail.com", PasswordHash = HashPassword("@Lecturer1"), Role = "Lecturer", FirstName = "Nguyễn", LastName = "Giảng Viên 1", DepartmentId = 1 },
                 new AppUser { Id = 3, Email = "student1@gmail.com", PasswordHash = HashPassword("@Cus1"), Role = "Student", FirstName = "Học", LastName = "Sinh 1" },
                 new AppUser { Id = 4, Email = "student2@gmail.com", PasswordHash = HashPassword("@Cus2"), Role = "Student", FirstName = "Học", LastName = "Sinh 2" },
                 new AppUser { Id = 100, Email = "hod@gmail.com", PasswordHash = HashPassword("@Hod1"), Role = "HeadOfDepartment", FirstName = "Trưởng", LastName = "Khoa CNTT", DepartmentId = 1 }
+            );
+
+            modelBuilder.Entity<HodTerm>().HasData(
+                new HodTerm { Id = 1, AppUserId = 100, DepartmentId = 1, StartAt = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc) }
             );
         }
 

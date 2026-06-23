@@ -75,7 +75,7 @@ graph TD
 
 ## 2. Luồng Xử Lý Tài Liệu (Document Ingestion Flow)
 
-Khi giảng viên / sinh viên tải lên một tài liệu (PDF, DOCX) vào hệ thống, các bước sau sẽ diễn ra:
+Khi Admin / Trưởng bộ môn tải lên một tài liệu (PDF, DOCX) vào hệ thống, các bước sau sẽ diễn ra:
 
 ### Bước 1: Tiếp nhận file từ người dùng
 *   **Thành phần:** `DocumentController` (Tầng Presentation)

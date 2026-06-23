@@ -1,0 +1,10 @@
+SWE101, Nhập môn Kỹ nghệ phần mềm
+PRO192, Lập trình hướng đối tượng với Java
+CSD201, Cấu trúc dữ liệu và giải thuật
+DBI202, Hệ quản trị cơ sở dữ liệu
+PRN211, Lập trình C# cơ bản
+PRJ301, Lập trình Java Web
+SWP391, Dự án phần mềm
+PRM392, Lập trình ứng dụng di động
+IOT102, Internet vạn vật (IoT) cơ bản
+MLN101, Nhập môn Học máy (Machine Learning)

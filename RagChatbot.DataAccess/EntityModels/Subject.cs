@@ -16,7 +16,7 @@ namespace RagChatbot.DataAccess.EntityModels
         // Navigation Properties
         public AppUser? User { get; set; }
         public Department? Department { get; set; }
-        public ICollection<SubjectAssignment> Assignments { get; set; } = new List<SubjectAssignment>();
+
         public ICollection<Document> Documents { get; set; } = new List<Document>();
         public ICollection<ChatSession> ChatSessions { get; set; } = new List<ChatSession>();
     }

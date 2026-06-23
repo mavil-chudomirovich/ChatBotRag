@@ -7,7 +7,7 @@
 - **Quản lý Môn học & Tài liệu:** Tạo môn học và upload PDF/DOCX vào từng môn.
 - **Xử lý Ngầm (Background Job):** Tài liệu tải lên được tự động trích xuất, chia nhỏ (Local Semantic Chunking) và mã hoá thành vector trong nền. Hệ thống chunking sử dụng thuật toán masking `ALPHANUMERICDOTMASK` để bảo toàn 100% tính toàn vẹn các con số tài chính/kế toán (ví dụ: `43.000`, `10.000.000`).
 - **Vector Search:** Mỗi chunk được embedding thành vector 768 chiều lưu trong PostgreSQL (`pgvector`), tìm kiếm bằng Cosine Similarity với HNSW Index.
-- **Realtime Streaming Chat:** Dùng **SignalR** để stream từng token phản hồi của AI về giao diện (giống ChatGPT).
+- **Realtime Streaming Chat:** Dùng WebSockets để stream từng token phản hồi của AI về giao diện (giống ChatGPT).
 - **Trích Dẫn Thông Minh (Citations):** Cuối mỗi câu trả lời, Bot chỉ rõ tên file và số trang đã dùng làm ngữ cảnh.
 - **Lịch sử Chat:** Hệ thống lưu và tải lại lịch sử hội thoại theo từng môn học.
 - **Xem tài lieu: Hệ thống cho phép học sinh xem tài lieu mà giảng viên đã up lên nếu muốn theo dõi chi tiết 
@@ -21,7 +21,7 @@
 | ORM | Entity Framework Core |
 | AI / LLM | Google AI Studio (`gemini-1.5-flash`) |
 | Embedding Model | `text-embedding-004` (768 chiều) |
-| Real-time | ASP.NET Core SignalR |
+| Real-time | ASP.NET Core WebSockets |
 | File Parsing | `UglyToad.PdfPig` (PDF), `DocumentFormat.OpenXml` (DOCX) |
 | Text Chunking | `Microsoft.SemanticKernel.Text.TextChunker` + Custom Numeric Masking |
 | Frontend | Razor Views + Tailwind CSS + ViewModels |
@@ -60,13 +60,15 @@ CHATBOTRAG
 
 ### Sơ Đồ Liên Kết Kiến Trúc
 
+![Sơ Đồ Kiến Trúc](./architecture.png)
+
 ```mermaid
 graph TD
     %% Định nghĩa các lớp
     subgraph PresentationLayer ["1. Tầng Trình Diễn (RagChatbot.Presentation)"]
         UI["Trình Duyệt (Views / JS / CSS)"]
         Ctrl["Controllers (HTTP)"]
-        Hub["ChatHub (SignalR)"]
+        Hub["ChatHub (WebSockets)"]
 
         UI <-->|HTTP Request/Response| Ctrl
         UI <-->|WebSockets| Hub
@@ -133,7 +135,7 @@ graph TD
  (Nhập liệu)   │ (Hiển thị / Phản hồi)
        ▼       │
 ┌─────────────────────────────────────────────────────────┐
-│               PRESENTATION LAYER (WebMVC & SignalR)     │
+│               PRESENTATION LAYER (WebMVC & WebSockets)  │
 │                                                         │
 │   [View / UI] <────(Dữ liệu)────> [Controller / Hub]    │
 └───────────────────────┬─────────────────▲───────────────┘
@@ -225,3 +227,4 @@ Mở trình duyệt tại `http://localhost:5000` (hoặc URL hiển thị trong
 |-----------|--------|
 | [SYSTEM_FLOW.md](./SYSTEM_FLOW.md) | Luồng hoạt động chi tiết: Document Ingestion & RAG Chat Flow |
 | [ENTITIES.md](./ENTITIES.md) | Mô tả Entities, DTOs, ViewModels & cấu hình DbContext |
+| [SystemRule.md](./SystemRule.md) | Đặc tả Quy tắc, Phân quyền hệ thống (Roles & Permissions) và Usecase chi tiết |
